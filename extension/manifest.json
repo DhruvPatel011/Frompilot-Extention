@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "FormPilot AI",
+  "version": "2.0.0",
+  "description": "AI-powered universal form filling assistant with smart field detection and key-value profiles.",
+  "author": "FormPilot AI Team",
+
+  "icons": {},
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "FormPilot AI"
+  },
+
+  "background": {
+    "service_worker": "background/background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["utils/storage.js", "utils/fuzzy.js", "content/content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "alarms"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "minimum_chrome_version": "100"
+}
