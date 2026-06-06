@@ -162,12 +162,7 @@
           <div class="report-row"><span class="report-key">Success Rate</span><span class="report-val grn" id="rRate">0%</span></div>
         </div>
       </div>
-      <div id="manualPanel" class="manual-panel hidden">
-        <div class="manual-header">
-          <span class="manual-title">⚠ Missing Fields — Fill One by One</span>
-        </div>
-        <div id="missingFieldsList" class="wizard-body"></div>
-      </div>
+      <!-- Wizard is rendered as overlay, not inline -->
       <div id="savePrompt" class="save-prompt hidden">
         <span class="save-prompt-text" id="savePromptText">Save values to profile?</span>
         <div class="save-prompt-btns">
@@ -341,6 +336,16 @@
         <button class="btn btn-ghost" id="cancelModal">Cancel</button>
         <button class="btn btn-primary" id="saveProfileBtn">Save</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Wizard Overlay - fixed position inside popup -->
+  <div id="manualPanel" class="wiz-overlay hidden">
+    <div class="wiz-overlay-card">
+      <div class="manual-header">
+        <span class="manual-title">⚠ Missing Fields — Fill One by One</span>
+      </div>
+      <div id="missingFieldsList" class="wizard-body"></div>
     </div>
   </div>
 

@@ -158,7 +158,7 @@ body{
 .report-val.red{color:var(--red);}
 
 /* MANUAL FILL */
-.manual-panel{background:var(--bg-card);border:1px solid rgba(220,38,38,0.25);border-radius:var(--r);overflow:hidden;flex-shrink:0;}
+.manual-panel{background:var(--bg-card);border:1px solid rgba(220,38,38,0.25);border-radius:var(--r);overflow:visible;flex-shrink:0;}
 .manual-header{display:flex;align-items:center;justify-content:space-between;padding:7px 11px;background:var(--red-lt);border-bottom:1px solid rgba(220,38,38,0.15);}
 .manual-title{font-size:12px;font-weight:700;color:var(--red);}
 .manual-list{display:flex;flex-direction:column;max-height:160px;overflow-y:auto;}
@@ -312,60 +312,117 @@ body{
 .loading-state{text-align:center;color:var(--text-3);font-size:12px;padding:16px 0;}
 
 /* ══════════════════════════════════════════════
-   STEP-BY-STEP WIZARD
+   WIZARD OVERLAY — fixed inside popup, always visible
 ══════════════════════════════════════════════ */
-.wizard-body{padding:0;}
+
+/* Full-screen overlay inside the 380x600 popup */
+.wiz-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,0.45);
+  display:flex;align-items:flex-end;
+  backdrop-filter:blur(1px);
+}
+.wiz-overlay.hidden{display:none!important;}
+
+/* The card slides up from bottom */
+.wiz-overlay-card{
+  width:100%;
+  background:var(--bg-card);
+  border-top:1px solid var(--border);
+  border-radius:var(--r-lg) var(--r-lg) 0 0;
+  display:flex;flex-direction:column;
+  max-height:92%;
+  animation:slideUpWiz .2s ease;
+  overflow:hidden;
+}
+@keyframes slideUpWiz{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.manual-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 13px 8px;
+  background:var(--red-lt);
+  border-bottom:1px solid rgba(220,38,38,0.15);
+  flex-shrink:0;
+}
+.manual-title{font-size:12px;font-weight:700;color:var(--red);}
+
+/* Wizard body scrolls if content is tall */
+.wizard-body{
+  overflow-y:auto;
+  flex:1;
+}
+.wizard-body::-webkit-scrollbar{width:3px;}
+.wizard-body::-webkit-scrollbar-thumb{background:var(--border);}
 
 /* Progress */
-.wiz-progress-wrap{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;}
+.wiz-progress-wrap{display:flex;align-items:center;gap:8px;padding:8px 13px 4px;flex-shrink:0;}
 .wiz-progress-bar{flex:1;height:4px;background:var(--bg-hover);border-radius:3px;overflow:hidden;}
 .wiz-progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s ease;}
-.wiz-step-count{font-size:10px;font-weight:700;color:var(--text-3);white-space:nowrap;flex-shrink:0;}
+.wiz-step-count{font-size:10px;font-weight:700;color:var(--text-3);white-space:nowrap;}
 
 /* Field card */
-.wiz-card{margin:0 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px;}
-
+.wiz-card{margin:6px 10px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;}
 .wiz-field-label{font-size:13px;font-weight:700;color:var(--text);line-height:1.4;}
-
 .wiz-input-area{width:100%;}
 
 /* Text input */
-.wiz-text-input{width:100%;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color var(--tr),box-shadow var(--tr);}
+.wiz-text-input{width:100%;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color var(--tr),box-shadow var(--tr);}
 .wiz-text-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
 .wiz-text-input::placeholder{color:var(--text-3);}
 
-/* Select */
-.wiz-select{width:100%;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;cursor:pointer;transition:border-color var(--tr);}
-.wiz-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+/* Date input */
+input[type="date"].wiz-text-input,input[type="time"].wiz-text-input,input[type="month"].wiz-text-input{
+  color-scheme:light dark;cursor:pointer;
+}
 
-/* Radio & Checkbox options */
-.wiz-radio-group,.wiz-checkbox-group{display:flex;flex-direction:column;gap:4px;max-height:150px;overflow-y:auto;}
-.wiz-radio-group::-webkit-scrollbar,.wiz-checkbox-group::-webkit-scrollbar{width:3px;}
-.wiz-radio-group::-webkit-scrollbar-thumb,.wiz-checkbox-group::-webkit-scrollbar-thumb{background:var(--border);}
+/* Option list — NO max-height, all options visible */
+.wiz-option-list{
+  display:flex;flex-direction:column;gap:4px;
+  outline:none;
+}
 
-.wiz-option-label{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--bg-card);cursor:pointer;font-size:12px;font-weight:500;color:var(--text);transition:all var(--tr);user-select:none;}
-.wiz-option-label:hover{border-color:var(--accent);background:var(--accent-lt);}
-.wiz-option-label:has(input:checked){border-color:var(--accent);background:var(--accent-lt);color:var(--accent);font-weight:600;}
-.wiz-radio,.wiz-checkbox{accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;cursor:pointer;}
+.wiz-option-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 11px;border-radius:var(--r-sm);
+  border:1.5px solid var(--border);
+  background:var(--bg-card);cursor:pointer;
+  font-size:13px;font-weight:500;color:var(--text);
+  transition:all var(--tr);user-select:none;
+}
+.wiz-option-item:hover{border-color:var(--accent);background:var(--accent-lt);}
+.wiz-option-item.wiz-focused{border-color:var(--accent);background:var(--accent-lt);}
+.wiz-option-item.wiz-selected{border-color:var(--accent);background:var(--accent);color:#fff;font-weight:700;}
+
+/* Radio indicator */
+.wiz-option-indicator{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid currentColor;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0.6;transition:all var(--tr);
+}
+.wiz-option-item.wiz-selected .wiz-option-indicator{opacity:1;}
+.wiz-option-item.wiz-selected .wiz-option-indicator::after{
+  content:'';width:7px;height:7px;border-radius:50%;background:#fff;
+}
+/* Checkbox indicator */
+.wiz-option-indicator.cb{border-radius:3px;}
+.wiz-option-item.wiz-selected .wiz-option-indicator.cb::after{
+  content:'✓';width:auto;height:auto;background:none;font-size:11px;color:#fff;font-weight:900;
+}
+.wiz-option-text{flex:1;}
 
 /* Hint */
-.wiz-hint{font-size:10px;color:var(--text-3);display:flex;align-items:center;gap:4px;}
-kbd{background:var(--bg-hover);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:10px;font-family:var(--font-mono);color:var(--text-2);}
+.wiz-hint{font-size:10px;color:var(--text-3);display:flex;align-items:center;gap:4px;padding:0 2px;}
+kbd{background:var(--bg-hover);border:1px solid var(--border);border-radius:3px;padding:1px 6px;font-size:9px;font-family:var(--font-mono);color:var(--text-2);}
 
 /* Buttons */
-.wiz-btns{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 10px;}
+.wiz-btns{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 12px;flex-shrink:0;}
 
-/* Done state */
-.wizard-done{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 16px;text-align:center;}
-.wizard-done-icon{font-size:28px;color:var(--green);}
-.wizard-done-text{font-size:13px;font-weight:700;color:var(--green);}
+/* Done */
+.wizard-done{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 16px;text-align:center;}
+.wizard-done-icon{font-size:32px;color:var(--green);}
+.wizard-done-text{font-size:14px;font-weight:700;color:var(--green);}
 
-/* Override old manual-list */
-.manual-list{display:flex;flex-direction:column;}
-.manual-panel{background:var(--bg-card);border:1px solid rgba(220,38,38,0.25);border-radius:var(--r);overflow:hidden;flex-shrink:0;}
-.manual-header{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--red-lt);border-bottom:1px solid rgba(220,38,38,0.15);}
-.manual-title{font-size:12px;font-weight:700;color:var(--red);}
-
-/* Keep old mf- classes for save prompt etc */
+/* Shared */
 .mf-req{color:var(--red);font-weight:700;}
 .mf-type-badge{background:var(--accent-lt);color:var(--accent);font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:.04em;text-transform:uppercase;margin-left:4px;vertical-align:middle;}

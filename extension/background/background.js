@@ -107,47 +107,45 @@ async function handleMsg(msg,sender){
           :'(empty — using context only)';
 
         const fieldList=fields.map((f,i)=>{
-          let line=`${i}. "${f.label}"`;
-          if(f.type&&f.type!=='text') line+=` [${f.type}]`;
+          let line=`${i}. "${f.label}" [${f.type||'text'}]${f.required?' *REQUIRED':''}`;
           if(f.options&&f.options.length>0){
-            line+=`\n   OPTIONS: ${f.options.map(o=>o.label||o.value).join(' | ')}`;
+            const optLabels=f.options.map(o=>o.label||o.value).filter(Boolean);
+            line+=`\n   OPTIONS: ${optLabels.join(' | ')}`;
           }
-          if(f.required) line+=' *required';
+          if(f.placeholder) line+=` (hint: ${f.placeholder})`;
           return line;
         }).join('\n');
 
-        const prompt=`You are FormPilot AI, an expert form-filling assistant.
+        const prompt=`You are FormPilot AI. Fill form fields using profile data AND context.
 
-## YOUR JOB
-Fill every form field using the user's profile data AND context clues. Parse context text intelligently.
-
-## USER PROFILE
+PROFILE DATA:
 ${profileText}
 
-## USER CONTEXT / INSTRUCTIONS
-${formContext||'(none)'}
+USER CONTEXT (read carefully and extract all info):
+${formContext||'none'}
 
-## IMPORTANT CONTEXT PARSING RULES
-- If context contains "name, email, phone" style data → extract each value
-- "dhruv, dhruvpatel4471@gmail.com, 9876543210" → Name=dhruv, Email=dhruvpatel4471@gmail.com, Phone=9876543210
-- For fields like "Organization" check context for company/college/school names
-- Use common sense: if context says "student at SVIT" → Organization=SVIT, College=SVIT
-- For dietary fields with no info → pick "None" or first option
-- For checkboxes with days/items → check what context says, else leave unchecked (empty)
+CONTEXT PARSING — extract these from context text if present:
+- Name/Full Name: first word or "name is X"
+- Email: anything with @ symbol
+- Phone: number sequence 10+ digits
+- Organization/College/Company: after "at", "from", "studying at", "working at"
+- City/Address: location mentions
+- Any key:value pairs like "college: SVIT" or "SVIT college"
 
-## FORM FIELDS
+FORM FIELDS TO FILL:
 ${fieldList}
 
-## FILLING RULES
-- For [select] and [radio_group]: you MUST respond with EXACTLY one of the listed OPTIONS (copy exactly)
-- For [checkbox_group]: respond with comma-separated values from OPTIONS list, or empty if none apply
-- For [checkbox]: respond "yes" or "no"
-- For text/email/phone/textarea: use profile or parse from context
-- Leave "" only if genuinely impossible
+RULES:
+1. [select] → copy EXACTLY one option from the OPTIONS list
+2. [radio_group] → copy EXACTLY one option from the OPTIONS list  
+3. [checkbox_group] → comma-separated options e.g. "Day 1,Day 2" — pick based on context, or "" if unclear
+4. [checkbox] → "yes" or "no"
+5. text/email/phone → use profile data first, then parse from context
+6. If context says "Dhruv Patel, svit college, 9876543210" → Name=Dhruv Patel, College=svit college, Phone=9876543210
+7. NEVER leave required fields empty if context has relevant info
 
-## RESPONSE FORMAT
-Return ONLY valid JSON, no markdown, no explanation:
-{"answers":{"0":"value","1":"value","2":"Day 1,Day 3",...}}`;
+OUTPUT: JSON only, no explanation, no markdown:
+{"answers":{"0":"answer","1":"answer",...}}`;
 
         const text=await callGemini(apiKey,prompt);
         const jsonMatch=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim().match(/\{[\s\S]*\}/);

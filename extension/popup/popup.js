@@ -269,10 +269,24 @@ async function handleFill(){
       payload:{answers:answers, delay:S.settings.fillDelay||80, highlightFields:S.settings.highlightFields!==false}
     });
 
-    var filled=fillRes.filled||0, total=S.detectedFields.length, missing=total-filled;
-    setStats(total, S.detectedFields.filter(function(f){return f.required;}).length, filled, missing);
+    var results = fillRes.results || {};
+    var total = S.detectedFields.length;
+    var filled = fillRes.filled || 0;
+
+    // Count truly missing: fields that were NOT filled by AI/profile AND not filled by content script
+    // A field is missing if:
+    // 1. No answer was generated (answers[i] is empty), OR
+    // 2. Content script returned non-'filled' state
+    var missingFields = S.detectedFields.filter(function(f, i) {
+      var hasAnswer = answers[i] !== undefined && answers[i] !== '';
+      var wasFilled = results[i] === 'filled';
+      return !hasAnswer || !wasFilled;
+    });
+    var missing = missingFields.length;
+
+    setStats(total, S.detectedFields.filter(function(f){return f.required;}).length, total - missing, missing);
     showReport(total, S.aiFilled, S.userFilled, missing);
-    if(missing>0) showManualPanel(answers, fillRes.results||{});
+    if(missing > 0) showManualPanel(answers, results);
 
     // Save history locally
     FPStorage.addHistoryEntry({
@@ -323,30 +337,25 @@ function showReport(total, ai, user, manual){
 /* ─── Manual Fill Panel ──────────────────────────────────────────────────── */
 /* ═══════════════════════════════════════════════
    STEP-BY-STEP MISSING FIELD WIZARD
-   One field at a time. Enter key = fill + next.
+   Overlay-based: always fully visible
 ═══════════════════════════════════════════════ */
 
 var wizard = {
-  fields: [],      // [{fieldData, index}]
-  current: 0,      // current step index
-  answers: {},     // index -> value entered
-  fillResults: {}, // index -> fill state from last fill
+  fields: [], current: 0, answers: {}, fillResults: {}
 };
 
 function initWizard(answers, results) {
-  // Collect all unfilled fields
   wizard.fields = S.detectedFields
     .map(function(f, i) { return { f: f, i: i }; })
     .filter(function(x) {
-      return !answers[x.i] || answers[x.i] === '' || results[x.i] !== 'filled';
+      var hasAnswer = answers[x.i] !== undefined && String(answers[x.i]).trim() !== '';
+      var wasFilled = results[x.i] === 'filled';
+      return !hasAnswer || !wasFilled;
     });
   wizard.current = 0;
   wizard.answers = {};
-
-  if (!wizard.fields.length) {
-    hide($('manualPanel'));
-    return;
-  }
+  wizard.fillResults = results;
+  if (!wizard.fields.length) { hide($('manualPanel')); return; }
   show($('manualPanel'));
   renderWizardStep();
 }
@@ -356,13 +365,14 @@ function renderWizardStep() {
   if (!list) return;
 
   var total = wizard.fields.length;
+
   if (wizard.current >= total) {
-    // All done
     list.innerHTML =
       '<div class="wizard-done">' +
         '<div class="wizard-done-icon">✓</div>' +
-        '<div class="wizard-done-text">All fields filled!</div>' +
+        '<div class="wizard-done-text">All fields done!</div>' +
       '</div>';
+    if (S.pendingSave.length > 0) setTimeout(showSavePrompt, 600);
     setTimeout(function() { hide($('manualPanel')); }, 1800);
     return;
   }
@@ -370,23 +380,27 @@ function renderWizardStep() {
   var item = wizard.fields[wizard.current];
   var f = item.f;
   var stepNum = wizard.current + 1;
+  var pct = Math.round((wizard.current / total) * 100);
+  var isLast = (wizard.current === total - 1);
 
-  // Progress bar
-  var pct = Math.round(((wizard.current) / total) * 100);
-
-  // Type badge
   var typeBadge = '';
-  if (f.type === 'select') typeBadge = '<span class="mf-type-badge">SELECT</span>';
+  if (f.type === 'select')       typeBadge = '<span class="mf-type-badge">SELECT</span>';
   else if (f.type === 'radio_group' || f.type === 'radio') typeBadge = '<span class="mf-type-badge">CHOICE</span>';
   else if (f.type === 'checkbox_group') typeBadge = '<span class="mf-type-badge">CHECKBOX</span>';
+  else if (f.type === 'date')    typeBadge = '<span class="mf-type-badge">DATE</span>';
+
+  var isOptionType = (f.type === 'radio_group' || f.type === 'radio' ||
+                      f.type === 'checkbox_group' || f.type === 'checkbox' ||
+                      f.type === 'select');
 
   list.innerHTML =
-    // Progress
+    // Progress bar
     '<div class="wiz-progress-wrap">' +
-      '<div class="wiz-progress-bar"><div class="wiz-progress-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="wiz-progress-bar">' +
+        '<div class="wiz-progress-fill" style="width:' + pct + '%"></div>' +
+      '</div>' +
       '<span class="wiz-step-count">' + stepNum + ' / ' + total + '</span>' +
     '</div>' +
-
     // Field card
     '<div class="wiz-card">' +
       '<div class="wiz-field-label">' +
@@ -394,187 +408,212 @@ function renderWizardStep() {
         (f.required ? '<span class="mf-req"> *</span>' : '') +
         (typeBadge ? ' ' + typeBadge : '') +
       '</div>' +
-
       '<div class="wiz-input-area" id="wizInputArea">' +
-        buildWizardInput(f, item.i) +
+        buildWizardInput(f) +
       '</div>' +
-
-      '<div class="wiz-hint">Press <kbd>Enter</kbd> to fill &amp; continue</div>' +
+      '<div class="wiz-hint">' +
+        (isOptionType
+          ? '<kbd>↑↓</kbd> navigate &nbsp;<kbd>Space</kbd> select &nbsp;<kbd>Enter</kbd> fill'
+          : 'Press <kbd>Enter</kbd> to fill &amp; continue') +
+      '</div>' +
     '</div>' +
-
-    // Buttons
+    // Action buttons
     '<div class="wiz-btns">' +
-      (wizard.current > 0 ? '<button class="btn btn-ghost btn-sm" id="wizPrevBtn">← Prev</button>' : '<div></div>') +
-      '<div style="display:flex;gap:6px">' +
+      (wizard.current > 0
+        ? '<button class="btn btn-ghost btn-sm" id="wizPrevBtn">← Prev</button>'
+        : '<div></div>') +
+      '<div style="display:flex;gap:6px;">' +
         '<button class="btn btn-ghost btn-sm" id="wizSkipBtn">Skip</button>' +
         '<button class="btn btn-primary btn-sm" id="wizFillBtn">' +
-          (wizard.current === total - 1 ? 'Fill ✓' : 'Fill & Next →') +
+          (isLast ? 'Fill ✓' : 'Fill & Next →') +
         '</button>' +
       '</div>' +
     '</div>';
 
-  // Go to field on page so user can see it
+  // Scroll field into view on page
   gotoFieldOnPage(item.i);
 
-  // Auto-focus input
-  setTimeout(function() {
-    var inp = list.querySelector('.wiz-text-input, .wiz-select, .wiz-radio-group input, .wiz-checkbox-group input');
-    if (inp) inp.focus();
-  }, 80);
-
-  // Button events
+  // Wire buttons
   var fillBtn = $('wizFillBtn');
-  if (fillBtn) fillBtn.addEventListener('click', function() { wizardFill(); });
-
+  if (fillBtn) fillBtn.addEventListener('click', function(e) { e.preventDefault(); wizardFill(); });
   var skipBtn = $('wizSkipBtn');
-  if (skipBtn) skipBtn.addEventListener('click', function() { wizardSkip(); });
-
+  if (skipBtn) skipBtn.addEventListener('click', function(e) { e.preventDefault(); wizardSkip(); });
   var prevBtn = $('wizPrevBtn');
-  if (prevBtn) prevBtn.addEventListener('click', function() { wizard.current--; renderWizardStep(); });
+  if (prevBtn) prevBtn.addEventListener('click', function(e) { e.preventDefault(); wizard.current--; renderWizardStep(); });
 
-  // Enter key on text inputs
-  var textInp = list.querySelector('.wiz-text-input');
-  if (textInp) {
-    textInp.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); wizardFill(); }
-    });
-  }
-  // Enter on select
-  var selInp = list.querySelector('.wiz-select');
-  if (selInp) {
-    selInp.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); wizardFill(); }
-    });
-  }
+  // Setup keyboard
+  setupWizardKeyboard(f);
 }
 
-function buildWizardInput(f, i) {
-  var type = f.type, opts = f.options || [];
+function buildWizardInput(f) {
+  var type = f.type;
+  var opts = f.options || [];
 
-  // SELECT
-  if (type === 'select' && opts.length) {
-    return '<select class="wiz-select" id="wizInput">' +
-      '<option value="">-- Select --</option>' +
-      opts.map(function(o) {
-        return '<option value="' + esc(o.label || o.value) + '">' + esc(o.label || o.value) + '</option>';
-      }).join('') +
-    '</select>';
-  }
-
-  // RADIO GROUP
-  if ((type === 'radio_group' || type === 'radio') && opts.length) {
-    return '<div class="wiz-radio-group" id="wizInput">' +
-      opts.map(function(o) {
-        return '<label class="wiz-option-label">' +
-          '<input type="radio" name="wiz_radio_' + i + '" class="wiz-radio" value="' + esc(o.label || o.value) + '">' +
-          '<span>' + esc(o.label || o.value) + '</span>' +
-        '</label>';
-      }).join('') +
-    '</div>';
-  }
-
-  // CHECKBOX GROUP
-  if (type === 'checkbox_group' && opts.length) {
-    return '<div class="wiz-checkbox-group" id="wizInput">' +
-      opts.map(function(o) {
-        return '<label class="wiz-option-label">' +
-          '<input type="checkbox" class="wiz-checkbox" value="' + esc(o.label || o.value) + '">' +
-          '<span>' + esc(o.label || o.value) + '</span>' +
-        '</label>';
+  // OPTION LIST types: select, radio, checkbox → all use same custom list UI
+  if (type === 'select' || type === 'radio_group' || type === 'radio' || type === 'checkbox_group') {
+    if (!opts.length) {
+      // Fallback: text input
+      return '<input type="text" class="wiz-text-input" id="wizMainInput" placeholder="Type answer…" autocomplete="off">';
+    }
+    var listType = (type === 'checkbox_group') ? 'checkbox' : 'radio';
+    return '<div class="wiz-option-list" id="wizMainInput" data-type="' + listType + '">' +
+      opts.map(function(o, i) {
+        var ind = listType === 'checkbox'
+          ? '<span class="wiz-option-indicator cb"></span>'
+          : '<span class="wiz-option-indicator"></span>';
+        return '<div class="wiz-option-item" data-index="' + i + '" data-value="' + esc(o.label || o.value) + '">' +
+          ind +
+          '<span class="wiz-option-text">' + esc(o.label || o.value) + '</span>' +
+        '</div>';
       }).join('') +
     '</div>';
   }
 
-  // SINGLE CHECKBOX
+  // SINGLE CHECKBOX → Yes / No
   if (type === 'checkbox') {
-    return '<label class="wiz-option-label" style="font-size:13px">' +
-      '<input type="checkbox" class="wiz-single-cb" id="wizInput" style="accent-color:var(--accent);width:16px;height:16px">' +
-      '<span>Yes — check this field</span>' +
-    '</label>';
+    return '<div class="wiz-option-list" id="wizMainInput" data-type="radio">' +
+      '<div class="wiz-option-item" data-index="0" data-value="yes">' +
+        '<span class="wiz-option-indicator"></span><span class="wiz-option-text">Yes</span>' +
+      '</div>' +
+      '<div class="wiz-option-item" data-index="1" data-value="no">' +
+        '<span class="wiz-option-indicator"></span><span class="wiz-option-text">No</span>' +
+      '</div>' +
+    '</div>';
   }
 
-  // TEXT / EMAIL / PHONE / etc
-  var it = type === 'email' ? 'email' : type === 'number' ? 'number' : type === 'url' ? 'url' : (type === 'phone' || type === 'tel') ? 'tel' : 'text';
-  var ph = f.placeholder ? f.placeholder : 'Type your answer…';
-  return '<input type="' + it + '" class="wiz-text-input" id="wizInput" placeholder="' + esc(ph) + '" autocomplete="off">';
+  // DATE / TIME / MONTH
+  if (type === 'date' || type === 'time' || type === 'month' || type === 'week') {
+    return '<input type="' + type + '" class="wiz-text-input" id="wizMainInput" autocomplete="off">';
+  }
+
+  // TEXT / EMAIL / PHONE / NUMBER / URL / TEXTAREA
+  var it = type === 'email' ? 'email'
+         : type === 'number' ? 'number'
+         : type === 'url' ? 'url'
+         : (type === 'phone' || type === 'tel') ? 'tel'
+         : 'text';
+  var ph = f.placeholder || 'Type your answer…';
+  return '<input type="' + it + '" class="wiz-text-input" id="wizMainInput" placeholder="' + esc(ph) + '" autocomplete="off">';
+}
+
+function setupWizardKeyboard(f) {
+  var area = $('wizInputArea');
+  if (!area) return;
+
+  var optList = area.querySelector('.wiz-option-list');
+
+  if (optList) {
+    // Option list: keyboard nav
+    var listType = optList.dataset.type; // 'radio' or 'checkbox'
+    var items = Array.from(optList.querySelectorAll('.wiz-option-item'));
+    var focusIdx = 0;
+
+    function setFocus(n) {
+      focusIdx = Math.max(0, Math.min(n, items.length - 1));
+      items.forEach(function(it, i) {
+        it.classList.toggle('wiz-focused', i === focusIdx);
+      });
+    }
+
+    function toggleItem(item) {
+      if (listType === 'radio') {
+        items.forEach(function(it) { it.classList.remove('wiz-selected'); });
+        item.classList.add('wiz-selected');
+      } else {
+        item.classList.toggle('wiz-selected');
+      }
+    }
+
+    // Click handler on each item
+    items.forEach(function(item, i) {
+      item.addEventListener('mousedown', function(e) {
+        e.preventDefault(); // prevent blur
+        setFocus(i);
+        toggleItem(item);
+      });
+    });
+
+    setFocus(0);
+    optList.setAttribute('tabindex', '0');
+    requestAnimationFrame(function() { optList.focus(); });
+
+    optList.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setFocus(focusIdx + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setFocus(focusIdx - 1); }
+      else if (e.key === ' ') { e.preventDefault(); toggleItem(items[focusIdx]); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        var anySelected = items.some(function(it) { return it.classList.contains('wiz-selected'); });
+        if (!anySelected) toggleItem(items[focusIdx]);
+        wizardFill();
+      }
+    });
+
+  } else {
+    // Text / date input
+    var inp = area.querySelector('#wizMainInput');
+    if (inp) {
+      requestAnimationFrame(function() { inp.focus(); });
+      inp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); wizardFill(); }
+      });
+    }
+  }
 }
 
 function getWizardValue() {
   var area = $('wizInputArea');
   if (!area) return '';
 
-  // Radio
-  var rc = area.querySelector('.wiz-radio:checked');
-  if (rc) return rc.value;
+  var optList = area.querySelector('.wiz-option-list');
+  if (optList) {
+    var listType = optList.dataset.type;
+    var selected = Array.from(optList.querySelectorAll('.wiz-option-item.wiz-selected'));
+    if (listType === 'radio') return selected.length ? selected[0].dataset.value : '';
+    else return selected.map(function(s) { return s.dataset.value; }).join(',');
+  }
 
-  // Checkboxes
-  var cbs = area.querySelectorAll('.wiz-checkbox:checked');
-  if (cbs.length) return Array.from(cbs).map(function(c) { return c.value; }).join(',');
-
-  // Single checkbox
-  var scb = area.querySelector('.wiz-single-cb');
-  if (scb) return scb.checked ? 'yes' : 'no';
-
-  // Select
-  var sel = area.querySelector('.wiz-select');
-  if (sel && sel.value) return sel.value;
-
-  // Text
-  var ti = area.querySelector('.wiz-text-input');
-  if (ti) return ti.value.trim();
-
-  return '';
+  var inp = area.querySelector('#wizMainInput');
+  return inp ? inp.value.trim() : '';
 }
 
 async function wizardFill() {
   var item = wizard.fields[wizard.current];
   if (!item) return;
-
   var val = getWizardValue();
 
-  // For checkbox, always allow (yes/no)
-  if (item.f.type !== 'checkbox' && !val) {
-    toast('Please enter a value', 'error');
-    var inp = document.querySelector('#wizInputArea .wiz-text-input, #wizInputArea .wiz-select');
-    if (inp) inp.focus();
+  // Require a value for non-checkbox types
+  var isOptional = (item.f.type === 'checkbox_group');
+  if (!val && !isOptional) {
+    var area = $('wizInputArea');
+    if (area) {
+      area.style.outline = '2px solid var(--red)';
+      setTimeout(function() { area.style.outline = ''; }, 700);
+    }
+    toast('Please enter or select a value', 'error', 1500);
     return;
   }
 
-  // Fill on page
+  // Send fill to page
   var tab = await getTab();
   if (tab) {
     try {
       var res = await chrome.tabs.sendMessage(tab.id, {
         type: 'FILL_SINGLE',
-        payload: { fieldIndex: item.i, value: val, delay: 50 }
+        payload: { fieldIndex: item.i, value: val || '', delay: 50 }
       });
       if (res && res.state === 'filled') {
         S.userFilled++;
         wizard.answers[item.i] = val;
-        // Offer to save
         if (S.settings.saveManualEntries && val && item.f.label) {
           S.pendingSave.push({ key: item.f.label, value: val });
         }
-        toast('✓ Filled!', 'success', 900);
-      } else {
-        toast('Could not fill — skipping', 'info', 1200);
       }
-    } catch(e) {
-      toast('Fill error — skipping', 'info', 1200);
-    }
+    } catch(e) {}
   }
 
   wizard.current++;
-
-  // If all done, show save prompt if we have entries
-  if (wizard.current >= wizard.fields.length && S.pendingSave.length > 0) {
-    setTimeout(function() {
-      renderWizardStep();
-      showSavePrompt();
-    }, 300);
-  } else {
-    setTimeout(function() { renderWizardStep(); }, 300);
-  }
+  setTimeout(renderWizardStep, 150);
 }
 
 function wizardSkip() {
@@ -593,6 +632,7 @@ async function gotoFieldOnPage(fieldIndex) {
     }
   } catch(e) {}
 }
+
 
 // Keep old showManualPanel name so rest of code works
 function showManualPanel(answers, results) {
