@@ -393,32 +393,47 @@ function renderWizardStep() {
                       f.type === 'checkbox_group' || f.type === 'checkbox' ||
                       f.type === 'select');
 
+  // Build option items HTML for option types
+  var optionsHTML = '';
+  if (isOptionType && f.options && f.options.length) {
+    var listType = f.type === 'checkbox_group' ? 'checkbox' : 'radio';
+    optionsHTML = f.options.map(function(o, oi) {
+      var ind = listType === 'checkbox'
+        ? '<span style="width:16px;height:16px;border-radius:3px;border:2px solid currentColor;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;"></span>'
+        : '<span style="width:16px;height:16px;border-radius:50%;border:2px solid currentColor;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;"></span>';
+      return '<div class="wiz-option-item" data-index="' + oi + '" data-value="' + esc(o.label || o.value) + '" data-type="' + listType + '" style="display:flex;align-items:center;gap:10px;padding:8px 11px;margin-bottom:4px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg-card);cursor:pointer;font-size:13px;font-weight:500;color:var(--text);">' +
+        ind +
+        '<span>' + esc(o.label || o.value) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
   list.innerHTML =
-    // Progress bar
-    '<div class="wiz-progress-wrap">' +
-      '<div class="wiz-progress-bar">' +
-        '<div class="wiz-progress-fill" style="width:' + pct + '%"></div>' +
+    '<div style="padding:8px 13px 4px;display:flex;align-items:center;gap:8px;">' +
+      '<div style="flex:1;height:4px;background:var(--bg-hover);border-radius:3px;overflow:hidden;">' +
+        '<div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:3px;transition:width .3s;"></div>' +
       '</div>' +
-      '<span class="wiz-step-count">' + stepNum + ' / ' + total + '</span>' +
+      '<span style="font-size:10px;font-weight:700;color:var(--text-3);">' + stepNum + ' / ' + total + '</span>' +
     '</div>' +
-    // Field card
-    '<div class="wiz-card">' +
-      '<div class="wiz-field-label">' +
+    '<div style="margin:6px 10px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;">' +
+      '<div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.4;">' +
         esc(f.label) +
-        (f.required ? '<span class="mf-req"> *</span>' : '') +
+        (f.required ? '<span style="color:var(--red);"> *</span>' : '') +
         (typeBadge ? ' ' + typeBadge : '') +
       '</div>' +
-      '<div class="wiz-input-area" id="wizInputArea">' +
-        buildWizardInput(f) +
+      '<div id="wizInputArea">' +
+        (isOptionType && optionsHTML
+          ? '<div id="wizMainInput" data-type="' + (f.type==='checkbox_group'?'checkbox':'radio') + '" style="display:flex;flex-direction:column;gap:4px;outline:none;">' + optionsHTML + '</div>'
+          : buildWizardInput(f)
+        ) +
       '</div>' +
-      '<div class="wiz-hint">' +
+      '<div style="font-size:10px;color:var(--text-3);">' +
         (isOptionType
           ? '<kbd>↑↓</kbd> navigate &nbsp;<kbd>Space</kbd> select &nbsp;<kbd>Enter</kbd> fill'
-          : 'Press <kbd>Enter</kbd> to fill &amp; continue') +
+          : 'Press <kbd>Enter</kbd> to fill & continue') +
       '</div>' +
     '</div>' +
-    // Action buttons
-    '<div class="wiz-btns">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px 12px;">' +
       (wizard.current > 0
         ? '<button class="btn btn-ghost btn-sm" id="wizPrevBtn">← Prev</button>'
         : '<div></div>') +
@@ -500,34 +515,72 @@ function setupWizardKeyboard(f) {
   var area = $('wizInputArea');
   if (!area) return;
 
-  var optList = area.querySelector('.wiz-option-list');
+  // Works with both .wiz-option-list (CSS class) and #wizMainInput (inline style div)
+  var optList = area.querySelector('#wizMainInput[data-type], .wiz-option-list');
 
-  if (optList) {
-    // Option list: keyboard nav
-    var listType = optList.dataset.type; // 'radio' or 'checkbox'
+  if (optList && optList.querySelector('.wiz-option-item')) {
+    var listType = optList.dataset.type;
     var items = Array.from(optList.querySelectorAll('.wiz-option-item'));
     var focusIdx = 0;
+
+    var SELECTED_BG = 'var(--accent)';
+    var SELECTED_COLOR = '#fff';
+    var NORMAL_BG = 'var(--bg-card)';
+    var NORMAL_COLOR = 'var(--text)';
+    var FOCUS_BG = 'var(--accent-lt)';
+    var FOCUS_BORDER = 'var(--accent)';
+    var NORMAL_BORDER = 'var(--border)';
+
+    function styleItem(item, state) {
+      if (state === 'selected') {
+        item.style.background = SELECTED_BG;
+        item.style.color = SELECTED_COLOR;
+        item.style.borderColor = SELECTED_BG;
+      } else if (state === 'focused') {
+        item.style.background = FOCUS_BG;
+        item.style.color = NORMAL_COLOR;
+        item.style.borderColor = FOCUS_BORDER;
+      } else {
+        item.style.background = NORMAL_BG;
+        item.style.color = NORMAL_COLOR;
+        item.style.borderColor = NORMAL_BORDER;
+      }
+    }
+
+    function isSelected(item) { return item.dataset.selected === '1'; }
 
     function setFocus(n) {
       focusIdx = Math.max(0, Math.min(n, items.length - 1));
       items.forEach(function(it, i) {
-        it.classList.toggle('wiz-focused', i === focusIdx);
+        if (isSelected(it)) styleItem(it, 'selected');
+        else if (i === focusIdx) styleItem(it, 'focused');
+        else styleItem(it, 'normal');
       });
     }
 
     function toggleItem(item) {
       if (listType === 'radio') {
-        items.forEach(function(it) { it.classList.remove('wiz-selected'); });
-        item.classList.add('wiz-selected');
+        items.forEach(function(it) {
+          it.dataset.selected = '0';
+          styleItem(it, 'normal');
+        });
+        item.dataset.selected = '1';
+        styleItem(item, 'selected');
       } else {
-        item.classList.toggle('wiz-selected');
+        if (isSelected(item)) {
+          item.dataset.selected = '0';
+          styleItem(item, 'normal');
+        } else {
+          item.dataset.selected = '1';
+          styleItem(item, 'selected');
+        }
       }
     }
 
-    // Click handler on each item
     items.forEach(function(item, i) {
+      item.dataset.selected = '0';
       item.addEventListener('mousedown', function(e) {
-        e.preventDefault(); // prevent blur
+        e.preventDefault();
         setFocus(i);
         toggleItem(item);
       });
@@ -538,19 +591,18 @@ function setupWizardKeyboard(f) {
     requestAnimationFrame(function() { optList.focus(); });
 
     optList.addEventListener('keydown', function(e) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setFocus(focusIdx + 1); }
+      if (e.key === 'ArrowDown' || e.key === 'Tab') { e.preventDefault(); setFocus(focusIdx + 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setFocus(focusIdx - 1); }
       else if (e.key === ' ') { e.preventDefault(); toggleItem(items[focusIdx]); }
       else if (e.key === 'Enter') {
         e.preventDefault();
-        var anySelected = items.some(function(it) { return it.classList.contains('wiz-selected'); });
+        var anySelected = items.some(function(it) { return it.dataset.selected === '1'; });
         if (!anySelected) toggleItem(items[focusIdx]);
         wizardFill();
       }
     });
 
   } else {
-    // Text / date input
     var inp = area.querySelector('#wizMainInput');
     if (inp) {
       requestAnimationFrame(function() { inp.focus(); });
@@ -565,12 +617,16 @@ function getWizardValue() {
   var area = $('wizInputArea');
   if (!area) return '';
 
-  var optList = area.querySelector('.wiz-option-list');
-  if (optList) {
+  var optList = area.querySelector('#wizMainInput[data-type], .wiz-option-list');
+  if (optList && optList.querySelector('.wiz-option-item')) {
     var listType = optList.dataset.type;
-    var selected = Array.from(optList.querySelectorAll('.wiz-option-item.wiz-selected'));
+    var items = Array.from(optList.querySelectorAll('.wiz-option-item'));
+    // Check both data-selected (inline style) and wiz-selected class (CSS approach)
+    var selected = items.filter(function(it) {
+      return it.dataset.selected === '1' || it.classList.contains('wiz-selected');
+    });
     if (listType === 'radio') return selected.length ? selected[0].dataset.value : '';
-    else return selected.map(function(s) { return s.dataset.value; }).join(',');
+    return selected.map(function(s) { return s.dataset.value; }).join(',');
   }
 
   var inp = area.querySelector('#wizMainInput');

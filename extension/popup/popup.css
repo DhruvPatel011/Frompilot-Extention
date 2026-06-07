@@ -28,12 +28,12 @@ body{
   font-family:var(--font);font-size:13px;line-height:1.5;
   background:var(--bg);color:var(--text);
   width:380px;min-width:380px;max-width:380px;
-  height:600px;max-height:600px;overflow:hidden;
+  height:600px;max-height:600px;overflow:visible;
   transition:background var(--tr),color var(--tr);
   position:relative;
 }
 
-.screen{display:none;width:100%;height:100%;position:absolute;top:0;left:0;background:var(--bg);overflow-y:auto;}
+.screen{display:none;width:100%;height:100%;position:absolute;top:0;left:0;background:var(--bg);overflow:visible;}
 .screen.active{display:block;}
 
 /* AUTH */
@@ -84,7 +84,7 @@ body{
 .err-msg{background:var(--red-lt);border:1px solid rgba(220,38,38,0.2);border-radius:var(--r-sm);padding:7px 10px;color:var(--red);font-size:12px;font-weight:500;}
 
 /* APP SHELL */
-#appScreen{display:none;flex-direction:column;height:600px;overflow:hidden;}
+#appScreen{display:none;flex-direction:column;height:600px;overflow:visible;position:relative;}
 #appScreen.active{display:flex;}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom:1px solid var(--border);background:var(--bg-card);flex-shrink:0;}
 .topbar-l{display:flex;align-items:center;gap:7px;}
@@ -98,7 +98,7 @@ body{
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--accent-lt);}
 
 /* TAB PANES - fixed height, no page movement */
-.tab-content{flex:1;overflow:hidden;position:relative;}
+.tab-content{flex:1;overflow:visible;position:relative;}
 .tab-pane{display:none;height:100%;overflow-y:auto;padding:11px 13px 13px;flex-direction:column;gap:9px;}
 .tab-pane.active{display:flex;}
 .tab-pane::-webkit-scrollbar{width:3px;}
@@ -317,7 +317,7 @@ body{
 
 /* Full-screen overlay inside the 380x600 popup */
 .wiz-overlay{
-  position:fixed;inset:0;z-index:500;
+  position:absolute;top:0;left:0;right:0;bottom:0;z-index:500;
   background:rgba(0,0,0,0.45);
   display:flex;align-items:flex-end;
   backdrop-filter:blur(1px);
@@ -331,9 +331,8 @@ body{
   border-top:1px solid var(--border);
   border-radius:var(--r-lg) var(--r-lg) 0 0;
   display:flex;flex-direction:column;
-  max-height:92%;
   animation:slideUpWiz .2s ease;
-  overflow:hidden;
+  overflow:visible;
 }
 @keyframes slideUpWiz{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 
@@ -346,13 +345,11 @@ body{
 }
 .manual-title{font-size:12px;font-weight:700;color:var(--red);}
 
-/* Wizard body scrolls if content is tall */
+/* Wizard body - shows all content */
 .wizard-body{
-  overflow-y:auto;
+  overflow-y:visible;
   flex:1;
 }
-.wizard-body::-webkit-scrollbar{width:3px;}
-.wizard-body::-webkit-scrollbar-thumb{background:var(--border);}
 
 /* Progress */
 .wiz-progress-wrap{display:flex;align-items:center;gap:8px;padding:8px 13px 4px;flex-shrink:0;}
