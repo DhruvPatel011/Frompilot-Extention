@@ -343,29 +343,29 @@
     )).filter(isVisible);
 
     const radioByName = new Map();
+    const radioFallback = [];
     for (const r of allRadios) {
-      const name = r.name || r.getAttribute('data-name') || r.closest('[role="radiogroup"]')?.id || ('rg_'+allRadios.indexOf(r));
-      if (!radioByName.has(name)) radioByName.set(name, []);
-      radioByName.get(name).push(r);
+      const name = r.name || r.getAttribute('data-name') || r.closest('[role="radiogroup"]')?.id || '';
+      if (name) {
+        if (!radioByName.has(name)) radioByName.set(name, []);
+        radioByName.get(name).push(r);
+      } else {
+        radioFallback.push(r);
+      }
     }
 
+    // Keep real same-name radio groups, but regroup one-off/unique-name radios by question.
     for (const [name, radios] of radioByName) {
-      radios.forEach(r => usedEls.add(r));
-      const first = radios[0];
-      const groupTitle = findGroupTitle(first) || getLabel(first) || 'Choice';
-      const options = radios.map(r => ({
-        el: r, value: r.value || '',
-        label: getLabel(r) || r.textContent.trim() || r.value || '',
-      }));
+      if (radios.length > 1) {
+        addRadioField(fields, usedEls, radios, name);
+      } else {
+        radioFallback.push(radios[0]);
+      }
+    }
 
-      fields.push({
-        element: first, allElements: radios, label: groupTitle, type: 'radio_group',
-        options, placeholder: '',
-        required: radios.some(r => r.required || r.getAttribute('aria-required')==='true'),
-        name, id: first.id||'',
-        currentValue: (radios.find(r => r.checked || r.getAttribute('aria-checked')==='true')||{}).value||'',
-        fillState: FS.DETECTED,
-      });
+    const fallbackRadioGroups = groupUnnamedRadios(radioFallback);
+    for (const radios of fallbackRadioGroups) {
+      addRadioField(fields, usedEls, radios, '');
     }
 
     // ── 3. TEXT / SELECT / TEXTAREA ──────────────────────────────────────────
@@ -431,6 +431,70 @@
         groups.push([cb]);
       }
     }
+    return groups;
+  }
+
+  function addRadioField(fields, usedEls, radios, name) {
+    radios.forEach(r => usedEls.add(r));
+    const first = radios[0];
+    const groupTitle = findGroupTitle(first) || getLabel(first) || 'Choice';
+    const options = radios.map(r => ({
+      el: r,
+      value: r.value || getLabel(r) || r.textContent.trim() || '',
+      label: getLabel(r) || r.textContent.trim() || r.value || '',
+    }));
+
+    fields.push({
+      element: first, allElements: radios, label: groupTitle, type: 'radio_group',
+      options, placeholder: '',
+      required: radios.some(r => r.required || r.getAttribute('aria-required')==='true'),
+      name, id: first.id||'',
+      currentValue: (radios.find(r => r.checked || r.getAttribute('aria-checked')==='true')||{}).value||'',
+      fillState: FS.DETECTED,
+    });
+  }
+
+  // Group unnamed radios by the smallest meaningful shared ancestor.
+  function groupUnnamedRadios(radios) {
+    if (!radios.length) return [];
+    const groups = [];
+    const used = new Set();
+
+    for (const radio of radios) {
+      if (used.has(radio)) continue;
+
+      let p = radio.parentElement;
+      let best = null;
+
+      for (let d = 0; d < 8; d++) {
+        if (!p || p === document.body || p === document.documentElement) break;
+
+        const inP = radios.filter(r => !used.has(r) && p.contains(r));
+        if (inP.length >= 2) {
+          const hasTitle =
+            p.getAttribute('role') === 'radiogroup' ||
+            p.querySelector('legend') ||
+            p.getAttribute('aria-labelledby') ||
+            p.getAttribute('aria-label') ||
+            hasDirectHeading(p) ||
+            findGroupTitle(radio);
+
+          if (hasTitle) {
+            best = inP;
+            break;
+          }
+
+          if (!best || inP.length < best.length) best = inP;
+        }
+
+        p = p.parentElement;
+      }
+
+      const group = best || [radio];
+      group.forEach(r => used.add(r));
+      groups.push(group);
+    }
+
     return groups;
   }
 
