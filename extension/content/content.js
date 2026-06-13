@@ -561,6 +561,25 @@
         return FS.FILLED;
       }
 
+      if (type === 'date') {
+        const raw = String(value).trim();
+        let dateVal = raw;
+        const dmySlash = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        const ymd = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (dmySlash) {
+          dateVal = `${dmySlash[3]}-${dmySlash[2].padStart(2,'0')}-${dmySlash[1].padStart(2,'0')}`;
+        } else if (ymd) {
+          dateVal = `${ymd[1]}-${ymd[2].padStart(2,'0')}-${ymd[3].padStart(2,'0')}`;
+        }
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (nativeSetter) nativeSetter.call(el, dateVal);
+        else el.value = dateVal;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return FS.FILLED;
+      }
+
+
       // CONTENTEDITABLE
       if (type === 'contenteditable' || el.contentEditable === 'true') {
         el.focus();

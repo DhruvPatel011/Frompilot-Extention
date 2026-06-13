@@ -35,7 +35,7 @@ async function apiCall(endpoint,method,body,retries=2){
 }
 
 async function callGemini(apiKey,prompt,retries=2){
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   for(let attempt=0;attempt<=retries;attempt++){
     try{
       const ctrl=new AbortController();
