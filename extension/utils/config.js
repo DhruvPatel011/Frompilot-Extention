@@ -8,20 +8,20 @@ const CONFIG = {
   // Set your deployed backend URL here for production builds
   // For development: set in chrome.storage.local via the options page
   API_URLS: {
-    production: 'https://formpilot-backend.onrender.com',
-    staging: 'https://formpilot-api-staging.onrender.com',
-    development: 'http://localhost:5000',
+    production: "https://formpilot-backend.onrender.com",
+    staging: "https://formpilot-api-staging.onrender.com",
+    development: "http://localhost:5000",
   },
-  
+
   // ─── Storage Keys ───────────────────────────────────────────────────────────
   STORAGE_KEYS: {
-    ACCESS_TOKEN: 'fp_access_token',
-    REFRESH_TOKEN: 'fp_refresh_token',
-    USER: 'fp_user',
-    ACTIVE_PROFILE: 'fp_active_profile',
-    SETTINGS: 'fp_settings',
-    ENV: 'fp_env',
-    TOKEN_EXPIRY: 'fp_token_expiry',
+    ACCESS_TOKEN: "fp_access_token",
+    REFRESH_TOKEN: "fp_refresh_token",
+    USER: "fp_user",
+    ACTIVE_PROFILE: "fp_active_profile",
+    SETTINGS: "fp_settings",
+    ENV: "fp_env",
+    TOKEN_EXPIRY: "fp_token_expiry",
   },
 
   // ─── Limits ─────────────────────────────────────────────────────────────────
@@ -29,13 +29,13 @@ const CONFIG = {
 
   // ─── Timeouts ───────────────────────────────────────────────────────────────
   API_TIMEOUT: 30000, // 30s
-  FILL_DELAY: 80,     // ms between field fills
+  FILL_DELAY: 80, // ms between field fills
 
   // ─── Field Matching ─────────────────────────────────────────────────────────
   MATCH_THRESHOLD: 0.6, // Minimum fuzzy match score
 
   // ─── Version ─────────────────────────────────────────────────────────────────
-  VERSION: '1.0.0',
+  VERSION: "1.0.0",
 };
 
 /**
@@ -45,7 +45,7 @@ const CONFIG = {
 async function getAPIBase() {
   return new Promise((resolve) => {
     chrome.storage.local.get([CONFIG.STORAGE_KEYS.ENV], (result) => {
-      const env = result[CONFIG.STORAGE_KEYS.ENV] || 'production';
+      const env = result[CONFIG.STORAGE_KEYS.ENV] || "production";
       const url = CONFIG.API_URLS[env] || CONFIG.API_URLS.production;
       resolve(url);
     });
@@ -61,6 +61,6 @@ async function setEnvironment(env) {
 }
 
 // Make available globally within extension context
-if (typeof module !== 'undefined') {
+if (typeof module !== "undefined") {
   module.exports = { CONFIG, getAPIBase, setEnvironment };
 }
