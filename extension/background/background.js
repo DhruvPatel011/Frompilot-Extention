@@ -154,14 +154,22 @@ OUTPUT: JSON only, no explanation, no markdown:
       }catch(err){return {success:false,error:err.message};}
     }
 
-    case 'FORM_DETECTED':{
-      const tabId=sender.tab?.id;
-      if(tabId){
-        chrome.action.setBadgeText({text:'!',tabId}).catch(()=>{});
-        chrome.action.setBadgeBackgroundColor({color:'#6366f1',tabId}).catch(()=>{});
+        case 'FORM_DETECTED':{
+        const tabId = sender?.tab?.id;
+        if(tabId){
+          chrome.action.setBadgeText({text:' ', tabId}).catch(()=>{});
+          chrome.action.setBadgeBackgroundColor({color:'#16a34a', tabId}).catch(()=>{});
+        } else {
+          // fallback — active tab pe set karo
+          chrome.tabs.query({active:true, currentWindow:true}, (tabs)=>{
+            if(tabs[0]?.id){
+              chrome.action.setBadgeText({text:' ', tabId:tabs[0].id}).catch(()=>{});
+              chrome.action.setBadgeBackgroundColor({color:'#16a34a', tabId:tabs[0].id}).catch(()=>{});
+            }
+          });
+        }
+        return {success:true};
       }
-      return {success:true};
-    }
     case 'FORM_FILLED':{
       const tabId=sender.tab?.id;
       if(tabId){
@@ -179,8 +187,9 @@ OUTPUT: JSON only, no explanation, no markdown:
   }
 }
 
-chrome.tabs.onUpdated.addListener((tabId,changeInfo)=>{
-  if(changeInfo.status==='loading') chrome.action.setBadgeText({text:'',tabId}).catch(()=>{});
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if(changeInfo.status === 'loading'){
+    chrome.action.setBadgeText({text:' ', tabId}).catch(()=>{});
+    chrome.action.setBadgeBackgroundColor({color:'#dc2626', tabId}).catch(()=>{});
+  }
 });
-chrome.alarms.create('keepAlive',{periodInMinutes:0.4});
-chrome.alarms.onAlarm.addListener(()=>{});
