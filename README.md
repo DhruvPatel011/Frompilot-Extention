@@ -424,11 +424,19 @@ Building FormPilot AI has provided practical experience with:
 
 ---
 
-## License
+## License & Usage
 
-FormPilot AI is distributed under the MIT License.
+FormPilot AI is proprietary software protected by copyright.
 
-See [LICENSE](LICENSE) for the complete license text.
+**All Rights Reserved.**
+
+The source code is publicly available for viewing and educational reference only. Public repository access does not grant permission to copy, modify, redistribute, republish, or commercially use this project.
+
+For additional permissions, prior written authorization from the copyright holder is required.
+
+See [LICENSE](LICENSE) for the complete terms.
+
+Third-party components remain subject to their respective licenses.
 
 ---
 
